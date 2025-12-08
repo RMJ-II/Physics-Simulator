@@ -1,0 +1,192 @@
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
+using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Threading;
+using static System.Net.Mime.MediaTypeNames;
+
+namespace Physics_Simulator
+{
+    public class Game1 : Game
+    {
+        private GraphicsDeviceManager _graphics;
+        private SpriteBatch _spriteBatch;
+        List<Ball> balls;
+        Ball StartingBall;
+        SpriteFont _font;
+        bool cursorOnBall, StartingCursorOnBall;
+        public SoundEffect ImpactSound;
+        float scale = 1f;
+        Rectangle box;
+        Texture2D _box;
+        bool Collision = true;
+        bool Dragging = false;
+        MouseState previousMouseState;
+        int currentBall = 0;
+
+        Texture2D _texture;
+
+        public Game1()
+        {
+            _graphics = new GraphicsDeviceManager(this);
+            Content.RootDirectory = "Content";
+            IsMouseVisible = true;
+        }
+
+        protected override void Initialize()
+        {
+            box = new Rectangle(650, 0, 150, 480);
+            // TODO: Add your initialization logic here
+            base.Initialize();
+        }
+
+        protected override void LoadContent()
+        {
+            _spriteBatch = new SpriteBatch(GraphicsDevice);
+            _box = Content.Load<Texture2D>("rectangle");
+            _texture = Content.Load<Texture2D>("ball2");
+            _font = Content.Load<SpriteFont>("DefaultFont");
+            ImpactSound = Content.Load<SoundEffect>("pool");
+
+            balls = new List<Ball>();
+
+            float ballRadius = 15f;
+            float ballDiameter = ballRadius * 2f;
+            float StartingBallRadius = 25f;
+            float StartingBallDiameter = StartingBallRadius * 2f;
+
+            float mass = 0.16f;
+            Vector2 ballPosition = new Vector2(box.X + box.Width/2 - (int)StartingBallRadius, 
+                box.Height - (int)(box.Height / 1.2 - (int)StartingBallRadius));
+            balls.Add(new Ball(new Vector2(ballPosition.X, ballPosition.Y), Vector2.Zero, 0.9f, 1f, _texture, mass, StartingBallRadius));
+            Vector2 rackStart = new Vector2(550, 240 - ballRadius);
+        }
+
+
+        protected override void Update(GameTime gameTime)
+        {
+            if (Keyboard.GetState().IsKeyDown(Keys.Escape))
+                Exit();
+
+            cursorOnBall = false;
+            StartingCursorOnBall = false;
+
+            if (Collision)
+            {
+                for (int i = 1; i < balls.Count; i++)
+                {
+                    balls[i].update(gameTime,
+                        GraphicsDevice.Viewport.Width - box.Width,
+                        GraphicsDevice.Viewport.Height);
+
+                    for (int j = i + 1; j < balls.Count; j++)
+                        balls[i].Collision(balls[j], ImpactSound);
+                }
+            }
+
+            Collision = true;
+
+            for (int i = 0; i < balls.Count; i++)
+                if (balls[i].IsCursorOnBall(balls[i]))
+                    cursorOnBall = true;
+
+            StartingCursorOnBall = balls[0].IsCursorOnBall(balls[0]);
+
+            MouseState mouse = Mouse.GetState();
+
+            if (mouse.LeftButton == ButtonState.Pressed &&
+                previousMouseState.LeftButton == ButtonState.Released &&
+                StartingCursorOnBall)
+            {
+                Dragging = true;
+
+                float Mx = mouse.X;
+                float My = mouse.Y;
+
+                balls.Add(new Ball(
+                    new Vector2(Mx - balls[0].r, My - balls[0].r),
+                    new Vector2(5, 12),
+                    balls[0].restitution,
+                    balls[0].friction,
+                    _texture,
+                    balls[0].m,
+                    balls[0].r
+                ));
+
+                currentBall = balls.Count - 1;
+                Collision = false;
+            }
+
+            if (Dragging)
+            {
+                float Mx = mouse.X;
+                float My = mouse.Y;
+                balls[currentBall].position = new Vector2(Mx - balls[0].r, My - balls[0].r);
+                float clampedX = Math.Clamp(Mx, balls[currentBall].r, GraphicsDevice.Viewport.Width - balls[currentBall].r);
+                float ClampedY = Math.Clamp(My, balls[currentBall].r, GraphicsDevice.Viewport.Height - balls[currentBall].r);
+                balls[currentBall].position = new Vector2(clampedX - balls[currentBall].r, ClampedY - balls[currentBall].r);
+            }
+
+            if (mouse.LeftButton == ButtonState.Released &&
+                previousMouseState.LeftButton == ButtonState.Pressed &&
+                Dragging)
+            {
+                Dragging = false;
+                Collision = true;
+
+                Rectangle ballRect = new Rectangle(
+                    (int)balls[currentBall].position.X,
+                    (int)balls[currentBall].position.Y,
+                    (int)(balls[currentBall].r * 2),
+                    (int)(balls[currentBall].r * 2)
+                );
+                Rectangle bounds = new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+                    
+                if (ballRect.Intersects(box))
+                    balls.RemoveAt(currentBall);
+                
+
+            }
+            //if (balls[currentBall].position.X > GraphicsDevice.Viewport.Width - balls[currentBall].r * 2)
+            //    balls[currentBall].position.X = GraphicsDevice.Viewport.Width - balls[currentBall].r * 2;
+            //if (balls[currentBall].position.X < 0)
+            //    balls[currentBall].position.X = 0;
+            //if (balls[currentBall].position.Y > GraphicsDevice.Viewport.Height - balls[currentBall].r * 2)
+            //    balls[currentBall].position.Y = GraphicsDevice.Viewport.Height - balls[currentBall].r * 2;
+            //if (balls[currentBall].position.Y < 0)
+            //    balls[currentBall].position.Y = 0;
+
+            if (Dragging)
+            {
+            }
+                
+            previousMouseState = mouse;
+            base.Update(gameTime);
+        }
+
+
+        protected override void Draw(GameTime gameTime)
+        {
+            
+            GraphicsDevice.Clear(Color.SkyBlue);
+            _spriteBatch.Begin();
+            _spriteBatch.Draw(_box, box, Color.HotPink);
+            balls[0].draw(_spriteBatch, balls[0].IsCursorOnBall(balls[0]) ? Color.Green : Color.Black);                                                                                                                                
+            for (int i = 1; i < balls.Count; i++)
+            {
+                if (balls[i].IsCursorOnBall(balls[i]))
+                {
+                    _spriteBatch.DrawString(_font, $"Speed: {Math.Round(balls[i].velocity.Length() * scale, 2)}\nEnergy: {Math.Round(0.5f * (float)balls[i].m * ((float)balls[i].velocity.LengthSquared() * scale * scale), 2)}", new Vector2(0, 0), Color.Red);
+                }
+                balls[i].draw(_spriteBatch, Color.Black);
+            }
+            _spriteBatch.End();
+            // TODO: Add your drawing code here
+
+            base.Draw(gameTime);
+        }
+    }
+}
