@@ -1,0 +1,67 @@
+using Microsoft.Xna.Framework;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows.Forms;
+
+namespace Physics_Simulator
+{
+    public partial class Form1 : Form
+    {
+        private Ball ball;
+        public Form1(Ball ballToEdit)
+        {
+            InitializeComponent();
+            ball = ballToEdit;
+            VertVelBox.Text = $"{ball.velocity.Y:F2}";
+            HorVelBox.Text = $"{ball.velocity.X:F2}";
+            MassBox.Text = ball.m.ToString();
+            eBox.Text = ball.restitution.ToString();
+            RadBox.Text = ball.r.ToString();
+        }
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            VertVelBox.Focus();
+            float prevRad = ball.r;
+        }
+        private void VertVelBox_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void eBox_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void OkButton_Click(object sender, EventArgs e)
+        {
+            float prevRad = ball.r;
+            if (float.TryParse(MassBox.Text, out float newMass))
+                ball.m = newMass;
+
+            if (float.TryParse(RadBox.Text, out float newRadius))
+                ball.r = newRadius;
+
+            if (float.TryParse(eBox.Text, out float newRest))
+                ball.restitution = Math.Clamp(newRest, 0f, 1f);
+
+            if (float.TryParse(VertVelBox.Text, out float j))
+                ball.velocity.Y = -j;
+
+            if (float.TryParse(HorVelBox.Text, out float i))
+                ball.velocity.X = i;
+            ball.position.X += (prevRad + ball.r)/2;
+            ball.position.Y += (prevRad + ball.r)/2;
+
+            DialogResult = DialogResult.OK;
+            Close();
+        }
+    }
+}
+
