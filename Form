@@ -18,16 +18,18 @@ namespace Physics_Simulator
         {
             InitializeComponent();
             ball = ballToEdit;
+            PosXBox.Text = $"{ball.position.X}";
+            PosYBox.Text = $"{ball.position.Y}";
             VertVelBox.Text = $"{ball.velocity.Y:F2}";
             HorVelBox.Text = $"{ball.velocity.X:F2}";
             MassBox.Text = ball.m.ToString();
             eBox.Text = ball.restitution.ToString();
             RadBox.Text = ball.r.ToString();
+            FrictionBox.Text = ball.friction.ToString();
         }
         private void Form1_Load(object sender, EventArgs e)
         {
-            VertVelBox.Focus();
-            float prevRad = ball.r;
+
         }
         private void VertVelBox_TextChanged(object sender, EventArgs e)
         {
@@ -42,6 +44,7 @@ namespace Physics_Simulator
         private void OkButton_Click(object sender, EventArgs e)
         {
             float prevRad = ball.r;
+            float prevY = ball.velocity.Y;
             if (float.TryParse(MassBox.Text, out float newMass))
                 ball.m = newMass;
 
@@ -52,15 +55,21 @@ namespace Physics_Simulator
                 ball.restitution = Math.Clamp(newRest, 0f, 1f);
 
             if (float.TryParse(VertVelBox.Text, out float j))
-                ball.velocity.Y = -j;
+                ball.velocity.Y = j;
 
             if (float.TryParse(HorVelBox.Text, out float i))
                 ball.velocity.X = i;
-            ball.position.X += (prevRad + ball.r)/2;
-            ball.position.Y += (prevRad + ball.r)/2;
+
+            ball.position.X += (prevRad - ball.r);
+            ball.position.Y += (prevRad - ball.r);
 
             DialogResult = DialogResult.OK;
             Close();
+        }
+
+        private void label1_Click(object sender, EventArgs e)
+        {
+
         }
     }
 }
