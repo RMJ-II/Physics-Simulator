@@ -2,6 +2,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using SharpDX.Direct3D9;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,12 +34,12 @@ namespace Physics_Simulator
         }
         public void update(GameTime gameTime, int screenWidth, int screenHeight)
         {
-            if (velocity.LengthSquared() < 0.01f)
+            if (velocity.LengthSquared() < 0.001f)
             {
                 velocity = Vector2.Zero;
             }
             float diameter = 2 * r;
-            velocity *= friction;
+            velocity *= (float)Math.Pow(friction, 0.02);
             if (position.X + diameter > screenWidth)
             {
                 position.X = screenWidth - diameter;
@@ -66,54 +67,53 @@ namespace Physics_Simulator
             Vector2 c1 = this.position + new Vector2(this.r, this.r);
             Vector2 c2 = other.position + new Vector2(other.r, other.r);
 
-            Vector2 delta = c2 - c1;
-            float distance = delta.Length();
-            float minDistance = this.r + other.r;
-            float volume = 1f;
+            Vector2 CentreLineForOther = c2 - c1;
+            Vector2 CentreLineForThis = c1 - c2;
+            Vector2 prevVel = this.velocity;
 
-            if (distance <= 0.0001f) return;
+            float distance = CentreLineForOther.Length();
+            float minDist = this.r + other.r;
+            float totalMass = this.m + other.m;
 
-            if (distance < minDistance)
-            { 
+            if (distance < minDist)
+            {
+                Vector2 unitCentreLineForOther = CentreLineForOther / distance;
+                Vector2 unitCentreLineForThis = CentreLineForOther / distance;
+                Vector2 unitWallLine = new Vector2(-unitCentreLineForOther.Y, unitCentreLineForOther.X);
 
-                Vector2 normal = delta / distance;
-                Vector2 tangent = new Vector2(-normal.Y, normal.X);
+                Vector2 initialThisVelAlongWallLine = Vector2.Dot(this.velocity, unitWallLine) * unitWallLine;
+                Vector2 initialOtherVelAlongWallLine = Vector2.Dot(other.velocity, unitWallLine) * unitWallLine;
+                Vector2 initialThisVelAlongCentreLine = Vector2.Dot(this.velocity, unitCentreLineForThis) * unitCentreLineForThis;
+                Vector2 initialOtherVelAlongCentreLine = Vector2.Dot(other.velocity, unitCentreLineForOther) * unitCentreLineForOther;
 
-                float v1n = Vector2.Dot(this.velocity, normal);
-                float v1t = Vector2.Dot(this.velocity, tangent);
-                float v2n = Vector2.Dot(other.velocity, normal);
-                float v2t = Vector2.Dot(other.velocity, tangent);
+                var u1 = initialThisVelAlongCentreLine;
+                var u2 = initialOtherVelAlongCentreLine;
+                var m1 = this.m;
+                var m2 = other.m;
+                var e = Math.Min(this.restitution, other.restitution);
 
-                float e = MathF.Min(this.restitution, other.restitution);
+                Vector2 finalThisVelAlongCentreLine = (u1 * m1 + u2 * m2 - m2 * e * (u1 - u2)) / (m1 + m2);
+                Vector2 finalOtherVelAlongCentreLine = (u1 * m1 + u2 * m2 + m1 * e * (u1 - u2)) / (m1 + m2);
 
-                if (v2n - v1n > 0)
-                    return;
+                this.velocity = finalThisVelAlongCentreLine + initialThisVelAlongWallLine;
+                other.velocity = finalOtherVelAlongCentreLine + initialOtherVelAlongWallLine;
 
-                float impulse = (-(1 + e) * (v2n - v1n)) / (1f / this.m + 1f / other.m);
+                float overlap = minDist - distance;
 
-                float v1nAfter = v1n - impulse / this.m;
-                float v2nAfter = v2n + impulse / other.m;
+                float moveRatio1 = this.m / totalMass;
+                float moveRatio2 = other.m / totalMass;
 
-                this.velocity = v1nAfter * normal + v1t * tangent;
-                other.velocity = v2nAfter * normal + v2t * tangent;
-
-                float overlap = minDistance - distance;
-
-                float totalMass = this.m + other.m;
-                float move1 = other.m / totalMass;
-                float move2 = this.m / totalMass;
-
-                c1 -= normal * overlap * move1;
-                c2 += normal * overlap * move2;
+                c1 -= unitCentreLineForThis * overlap * moveRatio1;
+                c2 += unitCentreLineForOther * overlap * moveRatio2;
 
                 this.position = c1 - new Vector2(this.r, this.r);
                 other.position = c2 - new Vector2(other.r, other.r);
 
-                volume = Math.Clamp(Math.Abs(impulse) / 50f, 0f, 1f);
+                Vector2 Impulse = this.m * this.velocity - prevVel;
+                float volume = Math.Clamp(Math.Abs(Impulse.Length()) / 30, 0f, 1f);
                 ImpactSoundInstance.Play(volume, 0f, 0f);
             }
         }
-
         public bool IsCursorOnBall(Ball ball)
         {
             MouseState mouseState = Mouse.GetState();
@@ -124,20 +124,6 @@ namespace Physics_Simulator
 
             float distanceSquared = (dx * dx + dy * dy);
             return distanceSquared <= ball.r * ball.r;
-        }
-        public void DragBall(Ball ball)
-        {
-            MouseState mouseState = Mouse.GetState();
-            Point mousePosition = mouseState.Position;
-            Vector2 ballCenter = ball.position + new Vector2(ball.r, ball.r);
-            Vector2 direction = new Vector2(mousePosition.X, mousePosition.Y) - ballCenter;
-            ball.velocity = direction * 0.01f;
-        }
-        public void setScale(float scale)
-        {
-            scale = 1 / scale;
-            r = r * scale;
-            velocity = velocity * scale;
         }
         public void draw(SpriteBatch spriteBatch, Color colour)
         {
