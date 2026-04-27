@@ -8,6 +8,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace Physics_Simulator
 {
@@ -18,18 +19,24 @@ namespace Physics_Simulator
         {
             InitializeComponent();
             ball = ballToEdit;
-            PosXBox.Text = $"{ball.position.X}";
-            PosYBox.Text = $"{ball.position.Y}";
+            PosXBox.Text = $"{ball.position.X:F0}";
+            PosYBox.Text = $"{ball.position.Y:F0}";
             VertVelBox.Text = $"{ball.velocity.Y:F2}";
             HorVelBox.Text = $"{ball.velocity.X:F2}";
             MassBox.Text = ball.m.ToString();
             eBox.Text = ball.restitution.ToString();
             RadBox.Text = ball.r.ToString();
             FrictionBox.Text = ball.friction.ToString();
+            this.AcceptButton = OkButton;
         }
         private void Form1_Load(object sender, EventArgs e)
         {
-
+        }
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            HorVelBox.Focus();
+            HorVelBox.SelectAll();
         }
         private void VertVelBox_TextChanged(object sender, EventArgs e)
         {
@@ -46,10 +53,10 @@ namespace Physics_Simulator
             float prevRad = ball.r;
             float prevY = ball.velocity.Y;
             if (float.TryParse(MassBox.Text, out float newMass))
-                ball.m = newMass;
+                ball.m = Math.Clamp(newMass, 0.1f, 10000f);
 
             if (float.TryParse(RadBox.Text, out float newRadius))
-                ball.r = newRadius;
+                ball.r = Math.Clamp(newRadius, 1f, 200f);
 
             if (float.TryParse(eBox.Text, out float newRest))
                 ball.restitution = Math.Clamp(newRest, 0f, 1f);
@@ -60,6 +67,15 @@ namespace Physics_Simulator
             if (float.TryParse(HorVelBox.Text, out float i))
                 ball.velocity.X = i;
 
+            if (float.TryParse(PosXBox.Text, out float x))
+                ball.position.X = x;
+
+            if (float.TryParse(PosYBox.Text, out float y))
+                ball.position.Y = y;
+
+            if (float.TryParse(FrictionBox.Text, out float f))
+                ball.friction = Math.Clamp(f, 0f, 1f);
+
             ball.position.X += (prevRad - ball.r);
             ball.position.Y += (prevRad - ball.r);
 
@@ -68,6 +84,16 @@ namespace Physics_Simulator
         }
 
         private void label1_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void VerticalVel_Click(object sender, EventArgs e)
+        {
+
+        }
+
+        private void label2_Click(object sender, EventArgs e)
         {
 
         }
