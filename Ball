@@ -30,7 +30,7 @@ namespace Physics_Simulator
             friction = Friction;
             m = mass;
             r = radius;
-            
+
         }
         public void update(GameTime gameTime, int screenWidth, int screenHeight)
         {
@@ -39,7 +39,12 @@ namespace Physics_Simulator
                 velocity = Vector2.Zero;
             }
             float diameter = 2 * r;
-            velocity *= (float)Math.Pow(friction, 0.02);
+            if (velocity.Length() > 0)
+            {
+                float accelerationMag = friction * 9.81f / 60f;
+                Vector2 acceleration = new Vector2((velocity.X / velocity.Length()) * accelerationMag, (velocity.Y / velocity.Length()) * accelerationMag);
+                velocity -= acceleration;
+            }
             if (position.X + diameter > screenWidth)
             {
                 position.X = screenWidth - diameter;
@@ -109,7 +114,7 @@ namespace Physics_Simulator
                 this.position = c1 - new Vector2(this.r, this.r);
                 other.position = c2 - new Vector2(other.r, other.r);
 
-                Vector2 Impulse = this.m * this.velocity - prevVel;
+                Vector2 Impulse = this.m * (this.velocity - prevVel);
                 float volume = Math.Clamp(Math.Abs(Impulse.Length()) / 30, 0f, 1f);
                 ImpactSoundInstance.Play(volume, 0f, 0f);
             }
