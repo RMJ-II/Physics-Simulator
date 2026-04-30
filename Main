@@ -46,7 +46,7 @@ namespace Physics_Simulator
             pauseRect = new Rectangle(box.X + 10, 10, 40, 40);
             saveRect = new Rectangle(pauseRect.X + 50, 10, 40, 40);
             openRect = new Rectangle(saveRect.X + 50, 10, 40, 40);
-            play = new Rectangle(pauseRect.X +5, pauseRect.Y + 5, 30, 30);
+            play = new Rectangle(pauseRect.X + 5, pauseRect.Y + 5, 30, 30);
             pause = new Rectangle(pauseRect.X + 6, pauseRect.Y + 5 - ofset, 30, 30);
             xy = new Rectangle(5, 5, 100, 100);
             graph = new Rectangle(0, 0, 880, 510);
@@ -79,9 +79,9 @@ namespace Physics_Simulator
             float StartingBallDiameter = StartingBallRadius * 2f;
             float mass = 1f;
             float restitution = 0.8f;
-            float friction = 1f;
+            float friction = 0f;
 
-            Vector2 ballPosition = new Vector2(box.X + box.Width/2 - (int)StartingBallRadius, 
+            Vector2 ballPosition = new Vector2(box.X + box.Width / 2 - (int)StartingBallRadius,
                                                box.Height - (int)(box.Height / 1.2 - (int)StartingBallRadius));
             balls.Add(new Ball(new Vector2(ballPosition.X, ballPosition.Y), Vector2.Zero, restitution, friction, _texture, mass, StartingBallRadius));
             Vector2 rackStart = new Vector2(550, 240 - ballRadius);
@@ -320,7 +320,7 @@ namespace Physics_Simulator
         }
         protected override void Draw(GameTime gameTime)
         {
-            
+
             GraphicsDevice.Clear(Color.SkyBlue);
             _spriteBatch.Begin();
             _spriteBatch.Draw(_graph, graph, Color.White);
