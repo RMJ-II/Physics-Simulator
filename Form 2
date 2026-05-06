@@ -53,7 +53,7 @@ namespace Physics_Simulator
             float prevRad = ball.r;
             float prevY = ball.velocity.Y;
             if (float.TryParse(MassBox.Text, out float newMass))
-                ball.m = Math.Clamp(newMass, 0.1f, 10000f);
+                ball.m = Math.Clamp(newMass, 0.1f, 1000000f);
 
             if (float.TryParse(RadBox.Text, out float newRadius))
                 ball.r = Math.Clamp(newRadius, 1f, 200f);
@@ -99,3 +99,4 @@ namespace Physics_Simulator
         }
     }
 }
+
