@@ -1,0 +1,365 @@
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
+using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
+using static System.Net.Mime.MediaTypeNames;
+
+namespace Physics_Simulator
+{
+    public class Game1 : Game
+    {
+        private GraphicsDeviceManager _graphics;
+        private SpriteBatch _spriteBatch;
+        List<Ball> balls;
+        SpriteFont _font;
+        bool StartingCursorOnBall;
+        bool CursorOnBall = false;
+        public SoundEffect ImpactSound;
+        Rectangle box, pauseRect, pause, play, xy, graph, save, open, saveRect, openRect;
+        Texture2D _box, _pause, _play, _xy, _graph, _save, _open;
+        bool Collision = true;
+        bool Dragging = false;
+        MouseState previousMouseState;
+        KeyboardState previousKeyboardState;
+        int currentBall = 0;
+        bool isPaused = false;
+        int ofset = 100;
+        int collisionCount;
+
+        Texture2D _texture;
+
+        public Game1()
+        {
+            _graphics = new GraphicsDeviceManager(this);
+            Content.RootDirectory = "Content";
+            IsMouseVisible = true;
+        }
+
+        protected override void Initialize()
+        {
+            int boxWidth = 160;
+            box = new Rectangle(GraphicsDevice.Viewport.Width - boxWidth, 0, boxWidth, 480);
+            pauseRect = new Rectangle(box.X + 10, 10, 40, 40);
+            saveRect = new Rectangle(pauseRect.X + 50, 10, 40, 40);
+            openRect = new Rectangle(saveRect.X + 50, 10, 40, 40);
+            play = new Rectangle(pauseRect.X + 5, pauseRect.Y + 5, 30, 30);
+            pause = new Rectangle(pauseRect.X + 6, pauseRect.Y + 5 - ofset, 30, 30);
+            xy = new Rectangle(5, 5, 100, 100);
+            graph = new Rectangle(0, 0, 880, 510);
+            save = new Rectangle(saveRect.X + 5, saveRect.Y + 5, 30, 30);
+            open = new Rectangle(openRect.X + 5, openRect.Y + 5, 30, 30);
+
+            // TODO: Add your initialization logic here
+            base.Initialize();
+        }
+
+        protected override void LoadContent()
+        {
+            _spriteBatch = new SpriteBatch(GraphicsDevice);
+            _box = Content.Load<Texture2D>("rectangle");
+            _texture = Content.Load<Texture2D>("ball2");
+            _font = Content.Load<SpriteFont>("DefaultFont");
+            _pause = Content.Load<Texture2D>("pause button");
+            _play = Content.Load<Texture2D>("play button");
+            _xy = Content.Load<Texture2D>("xy pic");
+            _graph = Content.Load<Texture2D>("gr");
+            _save = Content.Load<Texture2D>("save");
+            _open = Content.Load<Texture2D>("folder");
+            ImpactSound = Content.Load<SoundEffect>("pool");
+
+            balls = new List<Ball>();
+
+            float ballRadius = 15f;
+            float ballDiameter = ballRadius * 2f;
+            float StartingBallRadius = 25f;
+            float StartingBallDiameter = StartingBallRadius * 2f;
+            float mass = 1f;
+            float restitution = 1f;
+            float friction = 0f;
+
+            Vector2 ballPosition = new Vector2(box.X + box.Width / 2 - (int)StartingBallRadius,
+                                               box.Height - (int)(box.Height / 1.2 - (int)StartingBallRadius));
+            balls.Add(new Ball(new Vector2(ballPosition.X, ballPosition.Y), Vector2.Zero, restitution, friction, _texture, mass, StartingBallRadius));
+            Vector2 rackStart = new Vector2(550, 240 - ballRadius);
+        }
+        private void SaveBallData()
+        {
+            Thread thread = new Thread(() =>
+            {
+                var dialog = new System.Windows.Forms.SaveFileDialog
+                {
+                    Title = "Save Ball Data",
+                    Filter = "JSON Files (*.json)|*.json|Text Files (*.txt)|*.txt",
+                    DefaultExt = "json",
+                    FileName = "balls"
+                };
+
+                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    var data = balls.Skip(1).Select(b => new
+                    {
+                        posX = b.position.X,
+                        posY = b.position.Y,
+                        velX = b.velocity.X,
+                        velY = b.velocity.Y,
+                        radius = b.r,
+                        mass = b.m,
+                        restitution = b.restitution,
+                        friction = b.friction
+                    });
+
+                    string json = System.Text.Json.JsonSerializer.Serialize(data,
+                        new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                    System.IO.File.WriteAllText(dialog.FileName, json);
+                }
+            });
+
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+        }
+        private void LoadBallData()
+        {
+            Thread thread = new Thread(() =>
+            {
+                var dialog = new System.Windows.Forms.OpenFileDialog
+                {
+                    Title = "Load Ball Data",
+                    Filter = "JSON Files (*.json)|*.json",
+                    DefaultExt = "json"
+                };
+
+                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    string json = System.IO.File.ReadAllText(dialog.FileName);
+                    var data = System.Text.Json.JsonSerializer.Deserialize<List<BallData>>(json);
+
+                    if (data != null)
+                    {
+                        balls.RemoveRange(1, balls.Count - 1);
+
+                        foreach (var d in data)
+                        {
+                            balls.Add(new Ball(
+                                new Vector2(d.posX, d.posY),
+                                new Vector2(d.velX, d.velY),
+                                d.restitution,
+                                d.friction,
+                                _texture,
+                                d.mass,
+                                d.radius
+                            ));
+                        }
+                    }
+                }
+            });
+
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+        }
+        public class BallData
+        {
+            public float posX { get; set; }
+            public float posY { get; set; }
+            public float velX { get; set; }
+            public float velY { get; set; }
+            public float radius { get; set; }
+            public float mass { get; set; }
+            public float restitution { get; set; }
+            public float friction { get; set; }
+        }
+        protected override void Update(GameTime gameTime)
+        {
+            if (Keyboard.GetState().IsKeyDown(Keys.Escape))
+                Exit();
+
+            StartingCursorOnBall = balls[0].IsCursorOnBall(balls[0]);
+            MouseState mouse = Mouse.GetState();
+            KeyboardState keyboard = Keyboard.GetState();
+            if (!isPaused)
+            {
+                play.Y = pauseRect.Y + 5;
+                pause.Y -= ofset;
+                if (Collision)
+                {
+                    for (int i = 1; i < balls.Count; i++)
+                    {
+                        balls[i].update(gameTime,
+                            GraphicsDevice.Viewport.Width - box.Width,
+                            GraphicsDevice.Viewport.Height, ref collisionCount, Dragging);
+
+                        for (int j = i + 1; j < balls.Count; j++)
+                            balls[i].Collision(balls[j], ImpactSound, ref collisionCount, _spriteBatch, Color.Black);
+                    }
+                }
+                Collision = true;
+                if (previousMouseState.LeftButton == ButtonState.Released && mouse.LeftButton == ButtonState.Pressed &&
+                    IsCursorOnRect(pauseRect))
+                {
+                    isPaused = true;
+                }
+            }
+            else if (isPaused)
+            {
+                pause.Y = pauseRect.Y + 5;
+                play.Y -= ofset;
+                if (previousMouseState.LeftButton == ButtonState.Released && mouse.LeftButton == ButtonState.Pressed &&
+                IsCursorOnRect(pauseRect))
+                {
+                    isPaused = false;
+                }
+                for (int i = 1; i < balls.Count; i++)
+                {
+                    if (previousMouseState.RightButton == ButtonState.Released && mouse.RightButton == ButtonState.Pressed && balls[i].IsCursorOnBall(balls[i]))
+                    {
+                        var form = new Form1(balls[i]);
+                        form.ShowDialog();
+                    }
+                }
+                for (int k = 1; k < balls.Count; k++)
+                {
+                    CursorOnBall = balls[k].IsCursorOnBall(balls[k]);
+                    if (mouse.LeftButton == ButtonState.Pressed &&
+                        previousMouseState.LeftButton == ButtonState.Released &&
+                        CursorOnBall == true)
+                    {
+                        if (!Dragging)
+                        {
+                            Dragging = true;
+                            currentBall = k;
+                            Collision = false;
+                        }
+                        break;
+                    }
+
+                }
+                if (keyboard.IsKeyDown(Keys.LeftControl) && keyboard.IsKeyDown(Keys.S) && !previousKeyboardState.IsKeyDown(Keys.S) ||
+                    previousMouseState.LeftButton == ButtonState.Released && mouse.LeftButton == ButtonState.Pressed && IsCursorOnRect(saveRect))
+                    SaveBallData();
+
+                if (keyboard.IsKeyDown(Keys.LeftControl) && keyboard.IsKeyDown(Keys.O) && !previousKeyboardState.IsKeyDown(Keys.O) ||
+                    previousMouseState.LeftButton == ButtonState.Released && mouse.LeftButton == ButtonState.Pressed && IsCursorOnRect(openRect))
+                    LoadBallData();
+
+            }
+            if (mouse.LeftButton == ButtonState.Pressed &&
+                    previousMouseState.LeftButton == ButtonState.Released &&
+                    StartingCursorOnBall)
+            {
+                Dragging = true;
+
+                float Mx = mouse.X;
+                float My = mouse.Y;
+
+                balls.Add(new Ball(
+                    new Vector2(Mx - balls[0].r, My - balls[0].r),
+                    new Vector2(0, 0),
+                    balls[0].restitution,
+                    balls[0].friction,
+                    _texture,
+                    balls[0].m,
+                    balls[0].r
+                ));
+
+                currentBall = balls.Count - 1;
+                Collision = false;
+            }
+
+            if (Dragging && currentBall >= 0)
+            {
+                float Mx = mouse.X;
+                float My = mouse.Y;
+                balls[currentBall].position = new Vector2(Mx - balls[currentBall].r, My - balls[currentBall].r);
+                float clampedX = Math.Clamp(Mx, balls[currentBall].r - balls[currentBall].r * 0.0257f, GraphicsDevice.Viewport.Width - balls[currentBall].r + balls[currentBall].r * 0.036f);
+                float ClampedY = Math.Clamp(My, balls[currentBall].r, GraphicsDevice.Viewport.Height - balls[currentBall].r + balls[currentBall].r * 0.068f);
+                balls[currentBall].position = new Vector2(clampedX - balls[currentBall].r, ClampedY - balls[currentBall].r);
+            }
+
+            if (mouse.LeftButton == ButtonState.Released &&
+                previousMouseState.LeftButton == ButtonState.Pressed &&
+                Dragging)
+            {
+                Dragging = false;
+                Collision = true;
+
+                Rectangle ballRect = new Rectangle(
+                    (int)balls[currentBall].position.X,
+                    (int)balls[currentBall].position.Y,
+                    (int)(balls[currentBall].r * 2),
+                    (int)(balls[currentBall].r * 2)
+                );
+                Rectangle bounds = new Rectangle(0, 0, GraphicsDevice.Viewport.Width, GraphicsDevice.Viewport.Height);
+
+                if (ballRect.Intersects(box))
+                    balls.RemoveAt(currentBall);
+            }
+            previousMouseState = mouse;
+            previousKeyboardState = keyboard;
+            base.Update(gameTime);
+
+        }
+        public bool IsCursorOnRect(Rectangle rect)
+        {
+            float Cx = rect.X + rect.Width / 2;
+            float Cy = rect.Y + rect.Height / 2;
+
+            MouseState mouseState = Mouse.GetState();
+            Point mousePosition = mouseState.Position;
+
+            float dx = Math.Abs(Cx - mousePosition.X);
+            float dy = Math.Abs(Cy - mousePosition.Y);
+
+            if (dx <= rect.Width / 2 && dy <= rect.Height / 2)
+                return true;
+            return false;
+        }
+        protected override void Draw(GameTime gameTime)
+        {
+
+            GraphicsDevice.Clear(Color.SkyBlue);
+            _spriteBatch.Begin();
+            _spriteBatch.Draw(_graph, graph, Color.White);
+            _spriteBatch.Draw(_box, box, Color.HotPink);
+            _spriteBatch.Draw(_xy, xy, null, Color.SkyBlue);
+            _spriteBatch.DrawString(_font, "X", new Vector2(106, 4), Color.Black);
+            _spriteBatch.DrawString(_font, "Y", new Vector2(7, 105), Color.Black);
+            _spriteBatch.Draw(_box, pauseRect, Color.LavenderBlush);
+            if (!isPaused)
+            {
+                _spriteBatch.Draw(_box, saveRect, Color.SlateGray);
+                _spriteBatch.Draw(_box, openRect, Color.SlateGray);
+                _spriteBatch.Draw(_save, save, Color.SlateGray);
+                _spriteBatch.Draw(_open, open, Color.SlateGray);
+            }
+            else
+            {
+                _spriteBatch.Draw(_box, saveRect, Color.LavenderBlush);
+                _spriteBatch.Draw(_box, openRect, Color.LavenderBlush);
+                _spriteBatch.Draw(_save, save, Color.LavenderBlush);
+                _spriteBatch.Draw(_open, open, Color.LavenderBlush);
+            }
+            _spriteBatch.Draw(_pause, pause, Color.Black);
+            _spriteBatch.Draw(_play, play, Color.Black);
+            balls[0].draw(_spriteBatch, balls[0].IsCursorOnBall(balls[0]) ? Color.Green : Color.Black);
+
+            _spriteBatch.DrawString(_font, $"Collision: {collisionCount}", new Vector2(6, 420), Color.Red);
+            for (int i = 1; i < balls.Count; i++)
+            {
+                if (balls[i].IsCursorOnBall(balls[i]))
+                {
+                    _spriteBatch.DrawString(_font, $"Speed: {Math.Round(balls[i].velocity.Length(), 2)}\nEnergy: {Math.Round(0.5f * (float)balls[i].m * ((float)balls[i].velocity.LengthSquared()), 2)}", new Vector2(6, 440), Color.Red);
+                }
+                balls[i].draw(_spriteBatch, Color.Black);
+            }
+            _spriteBatch.End();
+            // TODO: Add your drawing code here
+            base.Draw(gameTime);
+        }
+    }
+}
