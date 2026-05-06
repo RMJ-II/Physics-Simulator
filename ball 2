@@ -34,16 +34,16 @@ namespace Physics_Simulator
         }
         public int update(GameTime gameTime, int screenWidth, int screenHeight, ref int collision, bool dragging)
         {
-            //if (velocity.LengthSquared() < 0.001f)
-            //{
-            //    velocity = Vector2.Zero;
-            //}
             float diameter = 2 * r;
-            if (velocity.Length() > 0)
+            float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+            if (velocity.Length() > 0f)
             {
-                float accelerationMag = friction * 9.81f / 60f;
-                Vector2 acceleration = new Vector2((velocity.X / velocity.Length()) * accelerationMag, (velocity.Y / velocity.Length()) * accelerationMag);
+                float accelerationMag = friction * 9.81f * dt;
+                Vector2 direction = Vector2.Normalize(velocity);
+                Vector2 acceleration = new Vector2(direction.X * accelerationMag, direction.Y * accelerationMag);
                 velocity -= acceleration;
+                if (velocity.Length() < accelerationMag)
+                    velocity = Vector2.Zero;
             }
             if (position.X + diameter > screenWidth)
             {
@@ -116,7 +116,6 @@ namespace Physics_Simulator
 
                 float overlap = minDist - distance;
 
-                //this.position -= (this.velocity * overlap) / this.velocity.Length();
                 float moveRatio1 = this.m / totalMass;
                 float moveRatio2 = other.m / totalMass;
 
@@ -134,11 +133,9 @@ namespace Physics_Simulator
                 {
                     c1 -= unitCentreLineForThis * overlap * moveRatio1;
                     c2 += unitCentreLineForOther * overlap * moveRatio2;
-
                     this.position = c1 - new Vector2(this.r, this.r);
                     other.position = c2 - new Vector2(other.r, other.r);
                 }
-
 
                 Vector2 Impulse = this.m * (this.velocity - prevVel);
                 float volume = Math.Clamp(Math.Abs(Impulse.Length()) / 30, 0f, 1f);
@@ -155,7 +152,7 @@ namespace Physics_Simulator
             float dy = mousePosition.Y - (ball.position.Y + ball.r);
 
             float distanceSquared = (dx * dx + dy * dy);
-            return distanceSquared <= ball.r * ball.r;
+            return distanceSquared <= ball.r * ball.r;  
         }
         public void draw(SpriteBatch spriteBatch, Color colour)
         {
