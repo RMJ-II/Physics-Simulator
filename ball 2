@@ -1,0 +1,166 @@
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
+using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
+using SharpDX.Direct3D9;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
+using System.Threading.Tasks;
+using static System.Formats.Asn1.AsnWriter;
+
+namespace Physics_Simulator
+{
+    public class Ball
+    {
+        public Vector2 position, velocity;
+        public float restitution;
+        public float friction;
+        public float m;
+        public float r;
+        private Texture2D texture;
+        public Ball(Vector2 startPosition, Vector2 startVelocity, float Restitution, float Friction, Texture2D tex, float mass, float radius)
+        {
+            texture = tex;
+            position = startPosition;
+            velocity = startVelocity;
+            restitution = Restitution;
+            friction = Friction;
+            m = mass;
+            r = radius;
+
+        }
+        public int update(GameTime gameTime, int screenWidth, int screenHeight, ref int collision, bool dragging)
+        {
+            //if (velocity.LengthSquared() < 0.001f)
+            //{
+            //    velocity = Vector2.Zero;
+            //}
+            float diameter = 2 * r;
+            if (velocity.Length() > 0)
+            {
+                float accelerationMag = friction * 9.81f / 60f;
+                Vector2 acceleration = new Vector2((velocity.X / velocity.Length()) * accelerationMag, (velocity.Y / velocity.Length()) * accelerationMag);
+                velocity -= acceleration;
+            }
+            if (position.X + diameter > screenWidth)
+            {
+                position.X = screenWidth - diameter;
+                velocity.X *= -restitution;
+                if (!dragging)
+                    collision++;
+            }
+            if (position.X < 0)
+            {
+                position.X = 0;
+                velocity.X *= -restitution;
+                if (!dragging)
+                    collision++;
+            }
+            if (position.Y + diameter > screenHeight)
+            {
+                position.Y = screenHeight - diameter;
+                velocity.Y *= -restitution;
+                if (!dragging)
+                    collision++;
+            }
+            if (position.Y < 0)
+            {
+                position.Y = 0;
+                velocity.Y *= -restitution;
+                if (!dragging)
+                    collision++;
+            }
+            position += velocity;
+            return collision;
+        }
+        public int Collision(Ball other, SoundEffect ImpactSoundInstance, ref int collision, SpriteBatch spriteBatch, Color colour)
+        {
+            Vector2 c1 = this.position + new Vector2(this.r, this.r);
+            Vector2 c2 = other.position + new Vector2(other.r, other.r);
+
+            Vector2 CentreLineForOther = c2 - c1;
+            Vector2 CentreLineForThis = c1 - c2;
+            Vector2 prevVel = this.velocity;
+
+            float distance = CentreLineForOther.Length();
+            float minDist = this.r + other.r;
+            float totalMass = this.m + other.m;
+
+            if (distance < minDist)
+            {
+                collision++;
+
+                Vector2 unitCentreLineForOther = CentreLineForOther / distance;
+                Vector2 unitCentreLineForThis = CentreLineForOther / distance;
+                Vector2 unitWallLine = new Vector2(-unitCentreLineForOther.Y, unitCentreLineForOther.X);
+
+                Vector2 initialThisVelAlongWallLine = Vector2.Dot(this.velocity, unitWallLine) * unitWallLine;
+                Vector2 initialOtherVelAlongWallLine = Vector2.Dot(other.velocity, unitWallLine) * unitWallLine;
+                Vector2 initialThisVelAlongCentreLine = Vector2.Dot(this.velocity, unitCentreLineForThis) * unitCentreLineForThis;
+                Vector2 initialOtherVelAlongCentreLine = Vector2.Dot(other.velocity, unitCentreLineForOther) * unitCentreLineForOther;
+
+                var u1 = initialThisVelAlongCentreLine;
+                var u2 = initialOtherVelAlongCentreLine;
+                var m1 = this.m;
+                var m2 = other.m;
+                var e = Math.Min(this.restitution, other.restitution);
+
+                Vector2 finalThisVelAlongCentreLine = (u1 * m1 + u2 * m2 - m2 * e * (u1 - u2)) / (m1 + m2);
+                Vector2 finalOtherVelAlongCentreLine = (u1 * m1 + u2 * m2 + m1 * e * (u1 - u2)) / (m1 + m2);
+
+                this.velocity = finalThisVelAlongCentreLine + initialThisVelAlongWallLine;
+                other.velocity = finalOtherVelAlongCentreLine + initialOtherVelAlongWallLine;
+
+                float overlap = minDist - distance;
+
+                //this.position -= (this.velocity * overlap) / this.velocity.Length();
+                float moveRatio1 = this.m / totalMass;
+                float moveRatio2 = other.m / totalMass;
+
+                if (this.m < other.m)
+                {
+                    c1 -= unitCentreLineForThis * overlap;
+                    this.position = c1 - new Vector2(this.r, this.r);
+                }
+                else if (other.m < this.m)
+                {
+                    c2 += unitCentreLineForOther * overlap;
+                    other.position = c2 - new Vector2(other.r, other.r);
+                }
+                else
+                {
+                    c1 -= unitCentreLineForThis * overlap * moveRatio1;
+                    c2 += unitCentreLineForOther * overlap * moveRatio2;
+
+                    this.position = c1 - new Vector2(this.r, this.r);
+                    other.position = c2 - new Vector2(other.r, other.r);
+                }
+
+
+                Vector2 Impulse = this.m * (this.velocity - prevVel);
+                float volume = Math.Clamp(Math.Abs(Impulse.Length()) / 30, 0f, 1f);
+                ImpactSoundInstance.Play(volume, 0f, 0f);
+            }
+            return collision;
+        }
+        public bool IsCursorOnBall(Ball ball)
+        {
+            MouseState mouseState = Mouse.GetState();
+            Point mousePosition = mouseState.Position;
+
+            float dx = mousePosition.X - (ball.position.X + ball.r);
+            float dy = mousePosition.Y - (ball.position.Y + ball.r);
+
+            float distanceSquared = (dx * dx + dy * dy);
+            return distanceSquared <= ball.r * ball.r;
+        }
+        public void draw(SpriteBatch spriteBatch, Color colour)
+        {
+            spriteBatch.Draw(texture, new Rectangle((int)position.X, (int)position.Y, 2 * (int)r, 2 * (int)r), colour);
+        }
+    }
+
+}
